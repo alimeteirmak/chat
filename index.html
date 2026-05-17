@@ -158,6 +158,8 @@
             background: #764ba2;
         }
     </style>
+    <script src="https://www.gstatic.com/firebasejs/9.25.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.25.0/firebase-database-compat.js"></script>
 </head>
 <body>
     <div class="chat-container">
@@ -178,41 +180,68 @@
     </div>
 
     <script>
-        let currentUsername = 'Anonymous';
+        // TODO: Replace these values with your Firebase project settings.
+        const firebaseConfig = {
+            apiKey: "AIzaSyCYnfMmj6FaPB3IzyxHgjk-o5E7-3tgzfg",
+            authDomain: "chat-3a415.firebaseapp.com",
+            databaseURL: "https://chat-3a415-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "chat-3a415",
+            storageBucket: "chat-3a415.firebasestorage.app",
+            messagingSenderId: "856759852021",
+            appId: "1:856759852021:web:f3726c87bb5ae185125ebc"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
         const chatMessages = document.getElementById('chatMessages');
         const messageInput = document.getElementById('messageInput');
         const usernameInput = document.getElementById('usernameInput');
 
-        // Load chat history from localStorage
-        function loadChatHistory() {
-            const history = localStorage.getItem('chatHistory');
-            if (history) {
-                chatMessages.innerHTML = history;
-                scrollToBottom();
-            }
+        let currentUsername = localStorage.getItem('chatUsername') || 'Anonymous';
+        let clientId = localStorage.getItem('chatClientId');
+        if (!clientId) {
+            clientId = `user-${Math.random().toString(36).slice(2)}`;
+            localStorage.setItem('chatClientId', clientId);
         }
 
-        // Save chat history to localStorage
-        function saveChatHistory() {
-            localStorage.setItem('chatHistory', chatMessages.innerHTML);
+        function loadUsername() {
+            const saved = localStorage.getItem('chatUsername');
+            if (saved) {
+                currentUsername = saved;
+                usernameInput.placeholder = `Name: ${currentUsername}`;
+            }
         }
 
         function setUsername() {
             const username = usernameInput.value.trim();
             if (username) {
                 currentUsername = username;
+                localStorage.setItem('chatUsername', currentUsername);
                 usernameInput.value = '';
-                addSystemMessage(`${username} joined the chat`);
+                usernameInput.placeholder = `Name: ${currentUsername}`;
+                addSystemMessage(`${currentUsername} joined the chat`);
             }
         }
 
         function sendMessage() {
             const message = messageInput.value.trim();
-            if (message) {
-                addMessage(currentUsername, message, true);
+            if (!message) return;
+
+            db.ref('messages').push({
+                username: currentUsername,
+                text: message,
+                clientId,
+                timestamp: Date.now()
+            })
+            .then(() => {
                 messageInput.value = '';
                 messageInput.focus();
-            }
+            })
+            .catch((error) => {
+                console.error('Write failed:', error);
+                alert('Unable to send message. Check your Firebase configuration.');
+            });
         }
 
         function handleKeyPress(event) {
@@ -224,16 +253,15 @@
         function addMessage(username, text, isUser) {
             const messageDiv = document.createElement('div');
             const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            
+
             messageDiv.className = `message ${isUser ? 'user' : 'other'}`;
             messageDiv.innerHTML = `
                 <div><strong>${username}</strong></div>
                 <div>${text}</div>
                 <div class="message-time">${time}</div>
             `;
-            
+
             chatMessages.appendChild(messageDiv);
-            saveChatHistory();
             scrollToBottom();
         }
 
@@ -242,7 +270,6 @@
             messageDiv.style.cssText = 'text-align: center; color: #999; font-size: 12px; padding: 10px; margin: 10px 0;';
             messageDiv.textContent = text;
             chatMessages.appendChild(messageDiv);
-            saveChatHistory();
             scrollToBottom();
         }
 
@@ -250,22 +277,29 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        // Initialize
-        loadChatHistory();
-        messageInput.focus();
-
-        // Simulate receiving messages (for demo)
-        function simulateMessage() {
-            const demoMessages = [
-                'Hey there!',
-                'How are you?',
-                'Welcome to the chat!',
-                'Nice to meet you!',
-                'Enjoying the chat?'
-            ];
-            const randomMsg = demoMessages[Math.floor(Math.random() * demoMessages.length)];
-            addMessage('Bot', randomMsg, false);
+        function listenForMessages() {
+            db.ref('messages')
+                .orderByChild('timestamp')
+                .limitToLast(100)
+                .on('value', (snapshot) => {
+                    const messages = [];
+                    snapshot.forEach((child) => {
+                        messages.push(child.val());
+                    });
+                    chatMessages.innerHTML = '';
+                    messages.forEach((data) => {
+                        const isUser = data.clientId === clientId;
+                        addMessage(data.username || 'Anonymous', data.text || '', isUser);
+                    });
+                }, (error) => {
+                    console.error('Listen failed:', error);
+                    addSystemMessage('Unable to load chat. Check Firebase configuration.');
+                });
         }
+
+        loadUsername();
+        listenForMessages();
+        messageInput.focus();
     </script>
 </body>
 </html>
