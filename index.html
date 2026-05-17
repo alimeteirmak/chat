@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Room</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            height: 600px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .message {
+            padding: 10px 15px;
+            border-radius: 8px;
+            word-wrap: break-word;
+            max-width: 80%;
+            animation: slideIn 0.3s ease-in;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .message.user {
+            background: #667eea;
+            color: white;
+            align-self: flex-end;
+            border-radius: 18px 18px 0 18px;
+        }
+        
+        .message.other {
+            background: #f0f0f0;
+            color: #333;
+            align-self: flex-start;
+            border-radius: 18px 18px 18px 0;
+        }
+        
+        .message-time {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+        
+        .chat-input-area {
+            padding: 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chat-input-area input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        .chat-input-area input:focus {
+            border-color: #667eea;
+        }
+        
+        .chat-input-area button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .chat-input-area button:hover {
+            transform: scale(1.05);
+        }
+        
+        .chat-input-area button:active {
+            transform: scale(0.95);
+        }
+        
+        .username-setup {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .username-setup input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 13px;
+        }
+        
+        .username-setup button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .username-setup button:hover {
+            background: #764ba2;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">💬 Chat Room</div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-area">
+            <div style="width: 100%; display: flex; flex-direction: column; gap: 10px;">
+                <div class="username-setup">
+                    <input type="text" id="usernameInput" placeholder="Enter your name..." maxlength="20">
+                    <button onclick="setUsername()">Set</button>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="messageInput" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
+                    <button onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUsername = 'Anonymous';
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const usernameInput = document.getElementById('usernameInput');
+
+        // Load chat history from localStorage
+        function loadChatHistory() {
+            const history = localStorage.getItem('chatHistory');
+            if (history) {
+                chatMessages.innerHTML = history;
+                scrollToBottom();
+            }
+        }
+
+        // Save chat history to localStorage
+        function saveChatHistory() {
+            localStorage.setItem('chatHistory', chatMessages.innerHTML);
+        }
+
+        function setUsername() {
+            const username = usernameInput.value.trim();
+            if (username) {
+                currentUsername = username;
+                usernameInput.value = '';
+                addSystemMessage(`${username} joined the chat`);
+            }
+        }
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message) {
+                addMessage(currentUsername, message, true);
+                messageInput.value = '';
+                messageInput.focus();
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function addMessage(username, text, isUser) {
+            const messageDiv = document.createElement('div');
+            const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            
+            messageDiv.className = `message ${isUser ? 'user' : 'other'}`;
+            messageDiv.innerHTML = `
+                <div><strong>${username}</strong></div>
+                <div>${text}</div>
+                <div class="message-time">${time}</div>
+            `;
+            
+            chatMessages.appendChild(messageDiv);
+            saveChatHistory();
+            scrollToBottom();
+        }
+
+        function addSystemMessage(text) {
+            const messageDiv = document.createElement('div');
+            messageDiv.style.cssText = 'text-align: center; color: #999; font-size: 12px; padding: 10px; margin: 10px 0;';
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+            saveChatHistory();
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Initialize
+        loadChatHistory();
+        messageInput.focus();
+
+        // Simulate receiving messages (for demo)
+        function simulateMessage() {
+            const demoMessages = [
+                'Hey there!',
+                'How are you?',
+                'Welcome to the chat!',
+                'Nice to meet you!',
+                'Enjoying the chat?'
+            ];
+            const randomMsg = demoMessages[Math.floor(Math.random() * demoMessages.length)];
+            addMessage('Bot', randomMsg, false);
+        }
+    </script>
+</body>
+</html>
